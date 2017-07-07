@@ -1,0 +1,104 @@
+'******************************************************
+'Author: Luis Ramirez
+'Twitter:  @luisramirezmex
+'Date: June 7, 2017
+'Description: Merge multiple Excel files into a single one
+'Usage:
+' 1. Create a C:\MergeExcelTool
+' 2. Copy MergeMultipleWorksheets.xlsm to C:\MergeExcelTool
+' 3. Copy all your Excel files to C:\MergeExcelTool
+' 4. Run the Excel macro CreateSingleExcel.
+' 5. A file Merge.xlsx willbe created containing all the information merged
+'******************************************************
+Option Explicit
+Public strPath As String
+
+Private Type SELECTINFO
+        hOwner As LongPtr
+        pidlRoot As LongPtr
+        pszDisplayName As String
+        lpszTitle As String
+        ulFlags As Long
+        lpfn As LongPtr
+        lParam As LongPtr
+        iImage As Long
+End Type
+
+Private Declare PtrSafe Function SHGetPathFromIDList Lib "shell32.dll" Alias "SHGetPathFromIDListA" _
+        (ByVal pidl As LongPtr, ByVal pszPath As String) As Boolean
+  
+                        
+Private Declare PtrSafe Function SHBrowseForFolder Lib "shell32.dll" Alias "SHBrowseForFolderA" _
+        (lpBrowseInfo As SELECTINFO) As LongPtr
+
+Function SelectFolder(Optional Msg) As String
+    Dim sInfo As SELECTINFO
+    Dim path As String
+    Dim r As Long, x As LongPtr, pos As Integer
+    sInfo.pidlRoot = 0&
+    
+    If IsMissing(Msg) Then
+        sInfo.lpszTitle = "Select your folder."
+    Else
+        sInfo.lpszTitle = Msg
+    End If
+    
+    sInfo.ulFlags = &H1
+    
+    x = SHBrowseForFolder(sInfo)
+    
+    path = Space$(512)
+    r = SHGetPathFromIDList(ByVal x, ByVal path)
+    If r Then
+        pos = InStr(path, Chr$(0))
+        SelectFolder = Left(path, pos - 1)
+    Else
+        SelectFolder = ""
+    End If
+End Function
+
+'@luisramirezmex: Merge all your excel files, including all sheets, to a main file.
+Sub CreateSingleExcel()
+    Dim workbookDestination As Workbook
+    Dim currentWorkbook As Workbook
+    Dim path As String
+    Dim Filename As String
+    Dim SourceCodeWorkBookName As String
+    Dim I As Integer
+    Dim defaultMergeFileName As String
+    
+    'This is the default name of the excel file to be merged. You need to create it manually.
+    defaultMergeFileName = "Merge.xlsx"
+    
+    SourceCodeWorkBookName = ActiveWorkbook.Name
+    
+    path = SelectFolder("Select a folder containing Excel files you want to merge")
+    
+    Filename = Dir(path & "\*.xls*", vbNormal)
+        
+    If Len(Filename) = 0 Then Exit Sub
+        
+    Set workbookDestination = Workbooks.Add
+    
+    Do Until Filename = vbNullString
+        If Not Filename = workbookDestination.Name And (Not Filename = SourceCodeWorkBookName) Then
+            Set currentWorkbook = Workbooks.Open(Filename:=path & "\" & Filename)
+                            
+            For I = 1 To currentWorkbook.Worksheets.Count
+                currentWorkbook.Sheets(I).Activate
+                currentWorkbook.Sheets(I).Select
+                currentWorkbook.Sheets(I).Copy After:=workbookDestination.Sheets(workbookDestination.Sheets.Count)
+            Next I
+            
+            currentWorkbook.Close False
+        End If
+ 
+        Filename = Dir()
+    Loop
+    workbookDestination.SaveAs Filename:=path & "\" & defaultMergeFileName
+    workbookDestination.Close True
+End Sub
+
+
+
+
